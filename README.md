@@ -65,7 +65,7 @@ path: path.join(process.env.HOME, "path/to/your/project/.env"),
 Once installed globally, you can run this command in any project directory:
 
 ```
-commit-gen generate
+commit-gen g
 ```
 
 This will use your current git diff to generate a commit message and offer to commit it automatically. If you just want the message without committing, you can modify the flow as needed.
