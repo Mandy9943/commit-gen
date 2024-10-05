@@ -6,17 +6,17 @@ This tool uses the Gemini AI model to generate commit messages based on your git
 
 ## Prerequisites
 
-- Node.js (v20 or later) (free)
-- npm (free)
-- Git (free)
-- Google AI Studio API key (free)
+* Node.js (v20 or later) (free)
+* npm (free)
+* Git (free)
+* Google AI Studio API key (free)
 
 ## Installation
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/ai-commit-message-generator.git
-   cd ai-commit-message-generator
+   git clone https://github.com/Mandy9943/commit-gen.git
+   cd commit-gen
    ```
 
 2. Install dependencies:
@@ -80,7 +80,7 @@ This tool is primarily designed for Unix-based systems (Linux, macOS). For Windo
 
 ## Troubleshooting
 
-If you encounter any issues while using this tool, please create an issue on the GitHub repository. We appreciate your feedback and will work to resolve any problems as quickly as possible.
+If you encounter any issues while using this tool, please create an issue on the [GitHub repository](https://github.com/Mandy9943/commit-gen). We appreciate your feedback and will work to resolve any problems as quickly as possible.
 
 ## Contributing
 
