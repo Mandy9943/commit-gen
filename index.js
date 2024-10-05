@@ -27,7 +27,7 @@ if (!API_KEY) {
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 program
-  .command("generate")
+  .command("g")
   .description("Generate a commit message using AI")
   .action(async () => {
     try {
