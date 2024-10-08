@@ -63,29 +63,58 @@ program
 
       // Use Gemini API to generate commit message
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-      const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}`;
+      const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}
+The commit message should have the following format:
+- First line: A brief summary of the change (50 characters or less)
+- Followed by a blank line
+- Then a more detailed explanation, wrapped at 72 characters
+- Use actual line breaks instead of \n
+- Do not use markdown formatting like ** for emphasis`;
 
       const result = await model.generateContent(prompt);
       const commitMessage = result.response.text();
 
-      // Display the commit message
-      console.log(`Generated Commit Message: \n${commitMessage}`);
+      // Display the generated commit message
+      console.log(`Generated Commit Message:\n${commitMessage}\n`);
 
-      // Option to auto-commit with the generated message
+      // Create a promise-based readline interface
       const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
       });
 
-      rl.question("Use this message for commit? (y/n): ", (answer) => {
+      const askQuestion = (query) =>
+        new Promise((resolve) => rl.question(query, resolve));
+
+      try {
+        const answer = await askQuestion(
+          "Use this message for commit? (y/n): "
+        );
+
         if (answer.toLowerCase() === "y") {
           // Stage all changes, including new files
           execSync("git add .");
-          execSync(`git commit -m "${commitMessage}"`);
-          console.log("Committed with AI-generated message.");
+
+          // Use -m option multiple times for multi-line messages
+          const commitLines = commitMessage.split("\n");
+          const commitCommand = `git commit ${commitLines
+            .map((line) => `-m "${line}"`)
+            .join(" ")}`;
+
+          try {
+            execSync(commitCommand, { stdio: "inherit" });
+            console.log("Committed with AI-generated message.");
+          } catch (error) {
+            console.error("Error during commit:", error.message);
+          }
+        } else {
+          console.log("Commit cancelled.");
         }
+      } catch (error) {
+        console.error("Error:", error);
+      } finally {
         rl.close();
-      });
+      }
     } catch (error) {
       console.error("Error generating commit message:", error);
     }
