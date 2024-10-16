@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { execSync } from "child_process";
 import { Command } from "commander";
 import dotenv from "dotenv";
 import fs from "fs/promises";
+import Groq from "groq-sdk";
 import path from "path";
 import readline from "readline";
 import simpleGit from "simple-git";
@@ -18,14 +18,16 @@ const program = new Command();
 const git = simpleGit();
 
 // Use the API key from .env file
-const API_KEY = process.env.GOOGLE_API_KEY;
+const API_KEY = process.env.GROQ_API_KEY;
 
 if (!API_KEY) {
-  console.error("Please set the GOOGLE_API_KEY in your .env file.");
+  console.error("Please set the GROQ_API_KEY in your .env file.");
   process.exit(1);
 }
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+const groq = new Groq({
+  apiKey: API_KEY,
+});
 
 program
   .command("g")
@@ -61,18 +63,44 @@ program
 
       console.log("Generating commit message...");
 
-      // Use Gemini API to generate commit message
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-      const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}
-The commit message should have the following format:
-- First line: A brief summary of the change (50 characters or less)
-- Followed by a blank line
-- Then a more detailed explanation, wrapped at 72 characters
-- Use actual line breaks instead of \n
-- Do not use markdown formatting like ** for emphasis`;
+      // Use Groq API to generate commit message
+      const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}`;
 
-      const result = await model.generateContent(prompt);
-      const commitMessage = result.response.text();
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          {
+            role: "system",
+            content: `You are a helpful assistant that generates git commit messages following the Conventional Commits specification.
+The commit message should follow the Conventional Commits specification:
+
+<type>[optional scope]: <description>
+
+[body]
+
+[optional footer(s)]
+
+- Types: feat (new feature), fix (bug fix), docs, style, refactor, perf, test, chore, ci, build
+- The description should be a short summary (50 chars or less) in present tense
+- The body should provide more detailed explanations, wrapped at 72 characters
+- Use BREAKING CHANGE: in the footer or ! after the type/scope for breaking changes
+- Use actual line breaks instead of \n
+- Do not use markdown formatting
+
+In your response, only output the commit message, no quotes, no markdown, no code blocks, no nothing else.
+              `,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        model: "llama3-70b-8192",
+        temperature: 0.5,
+        max_tokens: 1024,
+        top_p: 1,
+      });
+
+      const commitMessage = chatCompletion.choices[0]?.message?.content || "";
 
       // Display the generated commit message
       console.log(`Generated Commit Message:\n${commitMessage}\n`);
