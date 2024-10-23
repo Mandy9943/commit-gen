@@ -1,8 +1,8 @@
 # AI Commit Message Generator
 
-Generate commit messages for free.
+Generate commit messages using AI models.
 
-This tool uses the Gemini AI model to generate commit messages based on your git diff.
+This tool uses both the Google Gemini AI model and the Groq AI model to generate commit messages based on your git diff.
 
 ## Prerequisites
 
@@ -10,6 +10,7 @@ This tool uses the Gemini AI model to generate commit messages based on your git
 * npm (free)
 * Git (free)
 * Google AI Studio API key (free)
+* Groq API key (free)
 
 ## Installation
 
@@ -34,17 +35,23 @@ This tool uses the Gemini AI model to generate commit messages based on your git
    - Sign in with your Google account
    - Generate a new API key
 
-5. Add your Google API key to the `.env` file:
+5. Obtain a free Groq API key:
+   - Visit [Groq](https://console.groq.com/)
+   - Sign up for an account
+   - Generate a new API key
+
+6. Add your API keys to the `.env` file:
    ```
-   GOOGLE_API_KEY=your_api_key_here
+   GOOGLE_API_KEY=your_google_api_key_here
+   GROQ_API_KEY=your_groq_api_key_here
    ```
 
-6. Make sure your script has the right permissions and is executable:
+7. Make sure your script has the right permissions and is executable:
    ```
    chmod +x index.js
    ```
 
-7. Install the tool globally:
+8. Install the tool globally:
    ```
    npm link
    ```
@@ -62,13 +69,14 @@ path: path.join(process.env.HOME, "path/to/your/project/.env"),
 
 ## Usage
 
-Once installed globally, you can run this command in any project directory:
+Once installed globally, you can run these commands in any project directory:
 
 ```
-commit-gen g
+commit-gen gr  # Generate commit message using Groq AI (llama3-70b-8192 model)
+commit-gen ge  # Generate commit message using Google Gemini AI (gemini-1.5-pro model)
 ```
 
-This will use your current git diff to generate a commit message and offer to commit it automatically. If you just want the message without committing, you can modify the flow as needed.
+These commands will use your current git diff to generate a commit message and offer to commit it automatically. If you just want the message without committing, you can modify the flow as needed.
 
 ## Operating System Compatibility
 
