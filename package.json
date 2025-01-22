@@ -14,7 +14,9 @@
     "@google/generative-ai": "^0.21.0",
     "axios": "^1.7.7",
     "commander": "^12.1.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^16.4.7",
+    "groq-sdk": "^0.12.0",
+    "openai": "^4.80.0",
     "readline": "^1.3.0",
     "simple-git": "^3.27.0"
   },

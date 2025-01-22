@@ -6,6 +6,7 @@ import { Command } from "commander";
 import dotenv from "dotenv";
 import fs from "fs/promises";
 import Groq from "groq-sdk";
+import OpenAI from "openai";
 import path from "path";
 import readline from "readline";
 import simpleGit from "simple-git";
@@ -21,16 +22,23 @@ const git = simpleGit();
 // Use the API keys from .env file
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 
-if (!GROQ_API_KEY || !GOOGLE_API_KEY) {
+if (!GROQ_API_KEY || !GOOGLE_API_KEY || !DEEPSEEK_API_KEY) {
   console.error(
-    "Please set both GROQ_API_KEY and GOOGLE_API_KEY in your .env file."
+    "Please set GROQ_API_KEY, GOOGLE_API_KEY, and DEEPSEEK_API_KEY in your .env file."
   );
   process.exit(1);
 }
 
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
+
+// Initialize DeepSeek client
+const deepseek = new OpenAI({
+  baseURL: "https://api.deepseek.com",
+  apiKey: DEEPSEEK_API_KEY,
+});
 
 async function getGitChanges() {
   const status = await git.status();
@@ -49,10 +57,10 @@ async function getGitChanges() {
   return diff + "\n" + newFiles.join("\n");
 }
 
-async function generateCommitMessage(fullDiff, useGroq) {
+async function generateCommitMessage(fullDiff, model) {
   console.log("Generating commit message...");
 
-  if (useGroq) {
+  if (model === "groq") {
     const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}`;
     const chatCompletion = await groq.chat.completions.create({
       messages: [
@@ -89,6 +97,37 @@ In your response, only output the commit message, no quotes, no markdown, no cod
     });
 
     return chatCompletion.choices[0]?.message?.content || "";
+  } else if (model === "deepseek") {
+    const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}`;
+    const completion = await deepseek.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: `You are a helpful assistant that generates git commit messages following the Conventional Commits specification.
+The commit message should follow the Conventional Commits specification:
+
+<type>[optional scope]: <description>
+
+[body]
+
+[optional footer(s)]
+
+- Types: feat (new feature), fix (bug fix), docs, style, refactor, perf, test, chore, ci, build
+- The description should be a short summary (50 chars or less) in present tense
+- The body should provide more detailed explanations, wrapped at 72 characters
+- Use BREAKING CHANGE: in the footer or ! after the type/scope for breaking changes
+- Use actual line breaks instead of \n
+- Do not use markdown formatting`,
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      model: "deepseek-chat",
+    });
+
+    return completion.choices[0]?.message?.content || "";
   } else {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
     const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}
@@ -139,7 +178,7 @@ async function commitWithMessage(commitMessage) {
   }
 }
 
-async function generateAndCommit(useGroq) {
+async function generateAndCommit(model) {
   try {
     const fullDiff = await getGitChanges();
     if (!fullDiff) {
@@ -147,7 +186,7 @@ async function generateAndCommit(useGroq) {
       return;
     }
 
-    const commitMessage = await generateCommitMessage(fullDiff, useGroq);
+    const commitMessage = await generateCommitMessage(fullDiff, model);
     console.log(`Generated Commit Message:\n${commitMessage}\n`);
     await commitWithMessage(commitMessage);
   } catch (error) {
@@ -158,11 +197,16 @@ async function generateAndCommit(useGroq) {
 program
   .command("gr")
   .description("Generate a commit message using Groq AI")
-  .action(() => generateAndCommit(true));
+  .action(() => generateAndCommit("groq"));
 
 program
   .command("ge")
   .description("Generate a commit message using Google Gemini AI")
-  .action(() => generateAndCommit(false));
+  .action(() => generateAndCommit("gemini"));
+
+program
+  .command("ds")
+  .description("Generate a commit message using DeepSeek AI")
+  .action(() => generateAndCommit("deepseek"));
 
 program.parse(process.argv);
