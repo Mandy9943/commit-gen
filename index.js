@@ -41,8 +41,13 @@ const deepseek = new OpenAI({
 });
 
 async function getGitChanges() {
+  console.log("Fetching git changes...");
   const status = await git.status();
   const diff = await git.diff();
+  console.log(
+    `Found ${status.not_added.length} new files and changes in existing files`
+  );
+
   const newFiles = await Promise.all(
     status.not_added.map(async (file) => {
       try {
@@ -58,32 +63,44 @@ async function getGitChanges() {
 }
 
 async function generateCommitMessage(fullDiff, model) {
-  console.log("Generating commit message...");
+  console.log(
+    `Using ${model.toUpperCase()} model to generate commit message...`
+  );
+
+  const role = `You are a helpful assistant that generates git commit messages following the Conventional Commits specification.
+
+The commit message MUST follow this structure and must not exceed 100 characters in total:
+
+<type>[scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+
+Where:
+
+1) The first line (<type>[scope]: <description>) is a short summary (50 characters or less).
+   - <type> can be one of: feat, fix, docs, style, refactor, perf, test, chore, ci, build
+   - The scope is optional, but if used, should be in parentheses right after the type
+   - The description must be in present tense, summarizing the changes succinctly
+
+2) Keep the entire message brief, as the total length must not exceed 100 characters
+
+3) Use actual line breaks; do not encode them as "\n"
+
+4) Do not include any markdown formatting
+
+5) Return only the plain commit message text, without surrounding quotation marks or code fences
+          `;
 
   if (model === "groq") {
+    console.log("Sending request to Groq API...");
     const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}`;
     const chatCompletion = await groq.chat.completions.create({
       messages: [
         {
           role: "system",
-          content: `You are a helpful assistant that generates git commit messages following the Conventional Commits specification.
-The commit message should follow the Conventional Commits specification:
-
-<type>[optional scope]: <description>
-
-[body]
-
-[optional footer(s)]
-
-- Types: feat (new feature), fix (bug fix), docs, style, refactor, perf, test, chore, ci, build
-- The description should be a short summary (50 chars or less) in present tense
-- The body should provide more detailed explanations, wrapped at 72 characters
-- Use BREAKING CHANGE: in the footer or ! after the type/scope for breaking changes
-- Use actual line breaks instead of \n
-- Do not use markdown formatting
-
-In your response, only output the commit message, no quotes, no markdown, no code blocks, no nothing else.
-          `,
+          content: role,
         },
         {
           role: "user",
@@ -98,26 +115,13 @@ In your response, only output the commit message, no quotes, no markdown, no cod
 
     return chatCompletion.choices[0]?.message?.content || "";
   } else if (model === "deepseek") {
+    console.log("Sending request to DeepSeek API...");
     const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}`;
     const completion = await deepseek.chat.completions.create({
       messages: [
         {
           role: "system",
-          content: `You are a helpful assistant that generates git commit messages following the Conventional Commits specification.
-The commit message should follow the Conventional Commits specification:
-
-<type>[optional scope]: <description>
-
-[body]
-
-[optional footer(s)]
-
-- Types: feat (new feature), fix (bug fix), docs, style, refactor, perf, test, chore, ci, build
-- The description should be a short summary (50 chars or less) in present tense
-- The body should provide more detailed explanations, wrapped at 72 characters
-- Use BREAKING CHANGE: in the footer or ! after the type/scope for breaking changes
-- Use actual line breaks instead of \n
-- Do not use markdown formatting`,
+          content: role,
         },
         {
           role: "user",
@@ -127,16 +131,17 @@ The commit message should follow the Conventional Commits specification:
       model: "deepseek-chat",
     });
 
-    return completion.choices[0]?.message?.content || "";
+    // Clean up any markdown formatting from the response
+    let message = completion.choices[0]?.message?.content || "";
+    message = message.replace(/```[\s\S]*?```/g, ""); // Remove code blocks
+    message = message.trim(); // Remove extra whitespace
+    return message;
   } else {
+    console.log("Sending request to Google Gemini API...");
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}
-The commit message should have the following format:
-- First line: A brief summary of the change (50 characters or less)
-- Followed by a blank line
-- Then a more detailed explanation, wrapped at 72 characters
-- Use actual line breaks instead of \n
-- Do not use markdown formatting like ** for emphasis`;
+    const prompt = `${role}
+
+    Generate a concise commit message for the following git changes: ${fullDiff}`;
 
     const result = await model.generateContent(prompt);
     return result.response.text();
@@ -156,6 +161,7 @@ async function commitWithMessage(commitMessage) {
     const answer = await askQuestion("Use this message for commit? (y/n): ");
 
     if (answer.toLowerCase() === "y") {
+      console.log("Adding all changes to git staging...");
       execSync("git add .");
       const commitLines = commitMessage.split("\n");
       const commitCommand = `git commit ${commitLines
@@ -163,13 +169,14 @@ async function commitWithMessage(commitMessage) {
         .join(" ")}`;
 
       try {
+        console.log("Executing git commit...");
         execSync(commitCommand, { stdio: "inherit" });
-        console.log("Committed with AI-generated message.");
+        console.log("✅ Successfully committed with AI-generated message.");
       } catch (error) {
-        console.error("Error during commit:", error.message);
+        console.error("❌ Error during commit:", error.message);
       }
     } else {
-      console.log("Commit cancelled.");
+      console.log("❌ Commit cancelled by user.");
     }
   } catch (error) {
     console.error("Error:", error);
