@@ -62,7 +62,7 @@ async function getGitChanges() {
   return diff + "\n" + newFiles.join("\n");
 }
 
-async function generateCommitMessage(fullDiff, model) {
+async function generateCommitMessage(fullDiff, model, userMessage = "") {
   console.log(
     `Using ${model.toUpperCase()} model to generate commit message...`
   );
@@ -93,9 +93,13 @@ Where:
 5) Return only the plain commit message text, without surrounding quotation marks or code fences
           `;
 
+  const userGuidance = userMessage
+    ? `Consider this user's description when generating the commit message: ${userMessage}\n\n`
+    : "";
+
   if (model === "groq") {
     console.log("Sending request to Groq API...");
-    const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}`;
+    const prompt = `${userGuidance}Generate a concise commit message for the following git changes: ${fullDiff}`;
     const chatCompletion = await groq.chat.completions.create({
       messages: [
         {
@@ -116,7 +120,7 @@ Where:
     return chatCompletion.choices[0]?.message?.content || "";
   } else if (model === "deepseek") {
     console.log("Sending request to DeepSeek API...");
-    const prompt = `Generate a concise commit message for the following git changes: ${fullDiff}`;
+    const prompt = `${userGuidance}Generate a concise commit message for the following git changes: ${fullDiff}`;
     const completion = await deepseek.chat.completions.create({
       messages: [
         {
@@ -139,7 +143,7 @@ Where:
   } else {
     console.log("Sending request to Google Gemini API...");
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    const prompt = `${role}
+    const prompt = `${userGuidance}${role}
 
     Generate a concise commit message for the following git changes: ${fullDiff}`;
 
@@ -185,6 +189,23 @@ async function commitWithMessage(commitMessage) {
   }
 }
 
+async function getUserMessage() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const message = await new Promise((resolve) => {
+    rl.question(
+      "Enter your commit message description (optional, press Enter to skip): ",
+      resolve
+    );
+  });
+
+  rl.close();
+  return message.trim();
+}
+
 async function generateAndCommit(model) {
   try {
     const fullDiff = await getGitChanges();
@@ -193,7 +214,12 @@ async function generateAndCommit(model) {
       return;
     }
 
-    const commitMessage = await generateCommitMessage(fullDiff, model);
+    const userMessage = await getUserMessage();
+    const commitMessage = await generateCommitMessage(
+      fullDiff,
+      model,
+      userMessage
+    );
     console.log(`Generated Commit Message:\n${commitMessage}\n`);
     await commitWithMessage(commitMessage);
   } catch (error) {
